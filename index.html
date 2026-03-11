@@ -685,6 +685,7 @@ body {
       <span class="header-shop-name" id="header-shop-name">Payments Tracker</span>
     </div>
     <div class="header-right">
+      <span id="header-staff-name" style="font-size:0.8rem;color:rgba(255,255,255,0.85);font-weight:500"></span>
       <span class="header-staff-badge" id="header-role-badge">STAFF</span>
       <button class="logout-btn" onclick="handleLogout()" title="Sign out">⏻</button>
     </div>
@@ -806,7 +807,6 @@ body {
     <div class="page-title">Super Admin</div>
     <div class="page-sub">Manage all shops & admins</div>
     <div id="super-shops-list"><div class="loading-wrap">Loading...</div></div>
-    <button class="primary-btn" style="margin-top:0.8rem" onclick="openAddShopModal()">+ Add Shop</button>
   </div>
 
   <nav class="nav-bar" id="nav-bar">
@@ -939,6 +939,7 @@ function enterApp() {
   // Header
   const shopName = currentShop ? currentShop.name : 'Payments Tracker';
   document.getElementById('header-shop-name').textContent = shopName;
+  document.getElementById('header-staff-name').textContent = currentStaff.name;
   document.getElementById('header-role-badge').textContent = currentStaff.role;
 
   // Logo in header
@@ -994,6 +995,7 @@ function handleLogout() {
   // Reset nav
   document.getElementById('nav-admin').classList.add('hidden');
   document.getElementById('nav-super').classList.add('hidden');
+  document.getElementById('header-staff-name').textContent = '';
   // Reset theme
   document.documentElement.style.cssText = '';
 }
@@ -1061,7 +1063,6 @@ async function submitPayment() {
     const { error } = await db.from('payments').insert({
       supplier_name: supplier, amount, payment_method: selectedMethod,
       receipt_url, receipt_data, notes: notes || null,
-      created_by: currentStaff.name,
       shop_id: currentShop?.id || null,
       staff_id: currentStaff.id
     });
@@ -1090,7 +1091,7 @@ function resetPaymentForm() {
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 async function loadPayments() {
   document.getElementById('payment-list').innerHTML = '<div class="loading-wrap">Loading...</div>';
-  let query = db.from('payments').select('*').order('created_at', { ascending: false });
+  let query = db.from('payments').select('*, staff(name)').order('created_at', { ascending: false });
   if (currentShop) query = query.eq('shop_id', currentShop.id);
 
   const { data } = await query;
@@ -1119,7 +1120,7 @@ function renderPayments() {
     return `<div class="payment-card" onclick='openPaymentModal(${JSON.stringify(p).replace(/'/g,"&#39;")})'>
       <div>
         <div class="payment-supplier">${esc(p.supplier_name)}</div>
-        <div class="payment-meta">${fmtDate(p.created_at)} · ${esc(p.created_by||'')}</div>
+        <div class="payment-meta">${fmtDate(p.created_at)} · ${esc(p.staff?.name||'')}</div>
         <span class="badge badge-${p.payment_method}">${p.payment_method}</span>
       </div>
       <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:0.4rem">
@@ -1150,7 +1151,7 @@ function openPaymentModal(p) {
     <div class="modal-row"><span class="lbl">Amount</span><span class="val" style="font-family:'Playfair Display',serif;font-size:1.2rem">R ${parseFloat(p.amount).toFixed(2)}</span></div>
     <div class="modal-row"><span class="lbl">Method</span><span class="val"><span class="badge badge-${p.payment_method}">${p.payment_method}</span></span></div>
     <div class="modal-row"><span class="lbl">Date</span><span class="val">${fmtDate(p.created_at)}</span></div>
-    <div class="modal-row"><span class="lbl">Recorded by</span><span class="val">${esc(p.created_by||'—')}</span></div>
+    <div class="modal-row"><span class="lbl">Recorded by</span><span class="val">${esc(p.staff?.name||'—')}</span></div>
     ${p.notes ? `<div class="modal-row"><span class="lbl">Notes</span><span class="val">${esc(p.notes)}</span></div>` : ''}
     ${src ? `<img class="modal-receipt-img" src="${src}" alt="Receipt" onerror="this.style.display='none'"><br><a href="${src}" target="_blank" style="font-size:0.7rem;color:var(--app-primary)">Open full image ↗</a>` : ''}
   `;
@@ -1360,7 +1361,8 @@ async function loadSuperAdmin() {
         <button class="icon-btn" onclick="editShopModal(${JSON.stringify(s).replace(/"/g,'&quot;')})">✏️</button>
       </div>`).join('')}
 
-    <div class="section-heading" style="margin-top:1.4rem">Admins & Superadmins</div>
+    <button class="primary-btn" style="margin-bottom:1.4rem" onclick="openAddShopModal()">+ Add Shop</button>
+    <div class="section-heading" style="margin-top:0.4rem">Admins & Superadmins</div>
     ${(admins||[]).map(a => `
       <div class="list-card">
         <div class="list-card-info">
