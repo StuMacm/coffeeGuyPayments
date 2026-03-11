@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a0f00">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CaféPay">
+<title>CaféPay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --espresso: #1a0f00;
+    --roast: #3d1f00;
+    --caramel: #c07d2e;
+    --cream: #f5ede0;
+    --foam: #fdf6ee;
+    --error: #c0392b;
+    --success: #2ecc71;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--espresso);
+    color: var(--cream);
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+  }
+  .screen { display: none; min-height: 100dvh; flex-direction: column; animation: fadeIn 0.3s ease; }
+  .screen.active { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* LOGIN */
+  #screen-login {
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    background: radial-gradient(ellipse at 60% 20%, #3d1f0044 0%, transparent 60%),
+                radial-gradient(ellipse at 20% 80%, #c07d2e22 0%, transparent 50%),
+                var(--espresso);
+  }
+  .login-logo { text-align: center; margin-bottom: 3rem; }
+  .logo-icon { font-size: 4rem; display: block; margin-bottom: 0.5rem; filter: drop-shadow(0 0 20px #c07d2e88); }
+  .logo-title { font-family: 'Playfair Display', serif; font-size: 2.8rem; font-weight: 900; color: var(--caramel); letter-spacing: -0.02em; line-height: 1; }
+  .logo-sub { font-size: 0.75rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--cream); opacity: 0.5; margin-top: 0.4rem; }
+  .login-card { background: #ffffff0a; border: 1px solid #ffffff14; border-radius: 20px; padding: 2rem; width: 100%; max-width: 360px; backdrop-filter: blur(10px); }
+  .login-card h2 { font-family: 'Playfair Display', serif; font-size: 1.3rem; margin-bottom: 0.3rem; color: var(--cream); }
+  .login-card p { font-size: 0.8rem; opacity: 0.5; margin-bottom: 1.5rem; }
+
+  /* FIELDS */
+  .field { margin-bottom: 1rem; }
+  .field label { display: block; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.6; margin-bottom: 0.4rem; }
+  .field input, .field select, .field textarea {
+    width: 100%;
+    background: #ffffff0d;
+    border: 1px solid #ffffff1a;
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    color: var(--cream);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s;
+    appearance: none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--caramel); background: #ffffff14; }
+  .field input::placeholder, .field textarea::placeholder { opacity: 0.35; }
+  .field select option { background: var(--roast); color: var(--cream); }
+
+  .method-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .method-btn { background: #ffffff0d; border: 1px solid #ffffff1a; border-radius: 10px; padding: 0.85rem; color: var(--cream); font-family: 'DM Sans', sans-serif; font-size: 0.9rem; cursor: pointer; text-align: center; transition: all 0.2s; opacity: 0.6; }
+  .method-btn.active { background: var(--caramel); border-color: var(--caramel); color: var(--espresso); font-weight: 600; opacity: 1; }
+  .method-btn:hover:not(.active) { border-color: #ffffff33; opacity: 0.8; }
+
+  .upload-zone { border: 1.5px dashed #ffffff25; border-radius: 10px; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
+  .upload-zone:hover { border-color: var(--caramel); background: #ffffff08; }
+  .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-icon { font-size: 1.8rem; margin-bottom: 0.4rem; display: block; }
+  .upload-text { font-size: 0.8rem; opacity: 0.5; }
+  .upload-preview { width: 100%; border-radius: 8px; max-height: 140px; object-fit: cover; display: none; }
+
+  .btn { width: 100%; padding: 1rem; border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; letter-spacing: 0.02em; }
+  .btn-primary { background: var(--caramel); color: var(--espresso); }
+  .btn-primary:hover { background: #d4912e; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-ghost { background: transparent; color: var(--cream); border: 1px solid #ffffff1a; }
+  .btn-ghost:hover { border-color: #ffffff33; background: #ffffff0a; }
+
+  /* NAV */
+  .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #0d0700ee; backdrop-filter: blur(16px); border-top: 1px solid #ffffff12; display: grid; grid-template-columns: 1fr 1fr; padding: 0.5rem 1rem calc(0.5rem + env(safe-area-inset-bottom)); z-index: 100; }
+  .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; padding: 0.5rem; background: none; border: none; color: var(--cream); cursor: pointer; opacity: 0.4; transition: opacity 0.2s; font-family: 'DM Sans', sans-serif; font-size: 0.65rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  .nav-btn.active { opacity: 1; color: var(--caramel); }
+  .nav-btn span:first-child { font-size: 1.4rem; }
+
+  /* UPLOAD SCREEN */
+  #screen-upload { padding: 1.5rem 1.5rem calc(80px + env(safe-area-inset-bottom)); padding-top: calc(1.5rem + env(safe-area-inset-top)); }
+  .screen-header { margin-bottom: 1.8rem; }
+  .screen-header h1 { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900; color: var(--caramel); line-height: 1.1; }
+  .screen-header p { font-size: 0.8rem; opacity: 0.45; margin-top: 0.3rem; }
+  .amount-input-wrapper { position: relative; display: flex; align-items: center; }
+  .amount-symbol { position: absolute; left: 1rem; font-size: 1.5rem; color: var(--caramel); font-family: 'Playfair Display', serif; pointer-events: none; }
+  .amount-input-wrapper input { padding-left: 2.2rem !important; font-size: 1.6rem !important; font-family: 'Playfair Display', serif !important; font-weight: 700 !important; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: calc(80px + 1rem + env(safe-area-inset-bottom)); left: 1rem; right: 1rem; padding: 1rem 1.2rem; border-radius: 12px; font-size: 0.9rem; font-weight: 500; z-index: 200; transform: translateY(20px); opacity: 0; transition: all 0.3s ease; pointer-events: none; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { background: #1a3a2a; border: 1px solid #2ecc7188; color: #7dffc0; }
+  .toast.error { background: #3a1a1a; border: 1px solid #c0392b88; color: #ffaaaa; }
+
+  /* DASHBOARD */
+  #screen-dashboard { padding: 1.5rem 1.5rem calc(80px + env(safe-area-inset-bottom)); padding-top: calc(1.5rem + env(safe-area-inset-top)); }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.5rem; }
+  .stat-card { background: #ffffff08; border: 1px solid #ffffff10; border-radius: 14px; padding: 1.1rem; }
+  .stat-card.wide { grid-column: 1 / -1; }
+  .stat-label { font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.45; margin-bottom: 0.4rem; }
+  .stat-value { font-family: 'Playfair Display', serif; font-size: 1.8rem; font-weight: 700; color: var(--caramel); line-height: 1; }
+  .stat-value.sm { font-size: 1.3rem; }
+  .section-title { font-family: 'Playfair Display', serif; font-size: 1.1rem; margin-bottom: 0.75rem; opacity: 0.8; }
+  .filter-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; overflow-x: auto; padding-bottom: 0.25rem; scrollbar-width: none; }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .filter-chip { flex-shrink: 0; padding: 0.4rem 0.9rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500; background: #ffffff0d; border: 1px solid #ffffff1a; color: var(--cream); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .filter-chip.active { background: var(--caramel); border-color: var(--caramel); color: var(--espresso); font-weight: 700; }
+  .payment-list { display: flex; flex-direction: column; gap: 0.65rem; }
+  .payment-item { background: #ffffff08; border: 1px solid #ffffff0e; border-radius: 14px; padding: 1rem 1.1rem; display: flex; align-items: center; gap: 1rem; cursor: pointer; transition: background 0.15s; }
+  .payment-item:hover { background: #ffffff12; }
+  .payment-method-badge { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+  .payment-method-badge.cash { background: #2ecc7122; }
+  .payment-method-badge.card { background: #3498db22; }
+  .payment-info { flex: 1; min-width: 0; }
+  .payment-supplier { font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .payment-date { font-size: 0.7rem; opacity: 0.4; margin-top: 0.15rem; }
+  .payment-amount { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: var(--caramel); flex-shrink: 0; }
+  .receipt-thumb { width: 36px; height: 36px; border-radius: 7px; object-fit: cover; flex-shrink: 0; border: 1px solid #ffffff18; }
+  .empty-state { text-align: center; padding: 3rem 1rem; opacity: 0.4; }
+  .empty-state div:first-child { font-size: 2.5rem; margin-bottom: 0.75rem; }
+  .empty-state div:last-child { font-size: 0.85rem; }
+  .loading-dots { display: flex; gap: 5px; justify-content: center; padding: 2rem; }
+  .loading-dots span { width: 7px; height: 7px; background: var(--caramel); border-radius: 50%; animation: dot 1.2s infinite; opacity: 0.4; }
+  .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dot { 0%, 100% { opacity: 0.2; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: #000000cc; z-index: 300; display: none; align-items: flex-end; }
+  .modal-overlay.open { display: flex; animation: fadeIn 0.2s ease; }
+  .modal { background: #1a0f00; border: 1px solid #ffffff14; border-radius: 20px 20px 0 0; width: 100%; padding: 1.5rem; padding-bottom: calc(1.5rem + env(safe-area-inset-bottom)); max-height: 90dvh; overflow-y: auto; animation: slideUp 0.3s ease; }
+  @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-handle { width: 36px; height: 4px; background: #ffffff22; border-radius: 2px; margin: 0 auto 1.2rem; }
+  .modal-receipt { width: 100%; border-radius: 12px; margin-bottom: 1rem; }
+  .modal-row { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0; border-bottom: 1px solid #ffffff0a; font-size: 0.85rem; }
+  .modal-row:last-of-type { border-bottom: none; }
+  .modal-row .label { opacity: 0.45; }
+  .modal-row .val { font-weight: 500; color: var(--caramel); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="screen-login" class="screen active">
+  <div class="login-logo">
+    <span class="logo-icon">☕</span>
+    <div class="logo-title">CaféPay</div>
+    <div class="logo-sub">Payment Manager</div>
+  </div>
+  <div class="login-card">
+    <h2>Staff Access</h2>
+    <p>Enter the PIN to continue</p>
+    <div class="field">
+      <label>PIN</label>
+      <input type="password" id="pin-input" inputmode="numeric" placeholder="••••" maxlength="6" autocomplete="off">
+    </div>
+    <button class="btn btn-primary" onclick="handleLogin()">Enter</button>
+    <div id="login-error" style="color:#ffaaaa;font-size:0.8rem;margin-top:0.75rem;text-align:center;display:none;">Incorrect PIN. Try again.</div>
+  </div>
+</div>
+
+<!-- UPLOAD -->
+<div id="screen-upload" class="screen">
+  <div class="screen-header">
+    <h1>New Payment</h1>
+    <p>Record a supplier payment</p>
+  </div>
+  <div class="field">
+    <label>Supplier Name</label>
+    <input type="text" id="supplier-name" placeholder="e.g. Origin Coffee Roasters">
+  </div>
+  <div class="field">
+    <label>Amount</label>
+    <div class="amount-input-wrapper">
+      <span class="amount-symbol">R</span>
+      <input type="number" id="amount" inputmode="decimal" placeholder="0.00" step="0.01" min="0">
+    </div>
+  </div>
+  <div class="field">
+    <label>Payment Method</label>
+    <div class="method-toggle">
+      <button class="method-btn active" onclick="setMethod('cash', this)">💵 Cash</button>
+      <button class="method-btn" onclick="setMethod('card', this)">💳 Card</button>
+    </div>
+  </div>
+  <div class="field">
+    <label>Receipt Photo (optional)</label>
+    <div class="upload-zone">
+      <input type="file" id="receipt-file" accept="image/*" capture="environment" onchange="handleFileSelect(this)">
+      <span class="upload-icon" id="upload-icon">📷</span>
+      <div class="upload-text" id="upload-text">Tap to take photo or upload</div>
+      <img id="upload-preview" class="upload-preview" alt="Receipt preview">
+    </div>
+  </div>
+  <div class="field">
+    <label>Notes (optional)</label>
+    <textarea id="notes" rows="2" placeholder="Any additional details..." style="resize:none;"></textarea>
+  </div>
+  <button class="btn btn-primary" id="submit-btn" onclick="submitPayment()">Record Payment</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="screen-dashboard" class="screen">
+  <div class="screen-header">
+    <h1>Dashboard</h1>
+    <p>Payment overview</p>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card wide">
+      <div class="stat-label">Total Spent (All Time)</div>
+      <div class="stat-value" id="stat-total">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Payments</div>
+      <div class="stat-value sm" id="stat-count">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">This Month</div>
+      <div class="stat-value sm" id="stat-month">—</div>
+    </div>
+  </div>
+  <div class="filter-row">
+    <button class="filter-chip active" onclick="setFilter('all', this)">All</button>
+    <button class="filter-chip" onclick="setFilter('cash', this)">💵 Cash</button>
+    <button class="filter-chip" onclick="setFilter('card', this)">💳 Card</button>
+  </div>
+  <div class="section-title">Recent Payments</div>
+  <div class="payment-list" id="payment-list">
+    <div class="loading-dots"><span></span><span></span><span></span></div>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav class="nav-bar" id="nav-bar" style="display:none;">
+  <button class="nav-btn active" id="nav-upload" onclick="showScreen('upload')">
+    <span>＋</span><span>Upload</span>
+  </button>
+  <button class="nav-btn" id="nav-dashboard" onclick="showScreen('dashboard')">
+    <span>📊</span><span>Dashboard</span>
+  </button>
+</nav>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="handleModalClick(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <img id="modal-receipt-img" class="modal-receipt" style="display:none;" alt="Receipt">
+    <div id="modal-rows"></div>
+    <button class="btn btn-ghost" style="margin-top:1rem;" onclick="closeModal()">Close</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://rwhownojqqzoyntweqdd.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3aG93bm9qcXF6b3ludHdlcWRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNzkwMjAsImV4cCI6MjA4ODc1NTAyMH0.ICqlWKindaT3i-ePvjq-dCK99NGh-nTV0H1h8ZCKA-s';
+const STAFF_PIN = '1234'; // ⚠️ Change this before going live!
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let selectedMethod = 'cash';
+let selectedFile = null;
+let allPayments = [];
+let activeFilter = 'all';
+
+// AUTH
+function handleLogin() {
+  const pin = document.getElementById('pin-input').value;
+  if (pin === STAFF_PIN) {
+    document.getElementById('screen-login').classList.remove('active');
+    document.getElementById('nav-bar').style.display = 'grid';
+    showScreen('upload');
+    sessionStorage.setItem('auth', '1');
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('pin-input').value = '';
+    document.getElementById('pin-input').focus();
+  }
+}
+document.getElementById('pin-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
+if (sessionStorage.getItem('auth')) {
+  document.getElementById('screen-login').classList.remove('active');
+  document.getElementById('nav-bar').style.display = 'grid';
+  showScreen('upload');
+}
+
+// SCREENS
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'dashboard') loadPayments();
+}
+
+// METHOD
+function setMethod(method, btn) {
+  selectedMethod = method;
+  document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// FILE
+function handleFileSelect(input) {
+  if (!input.files.length) return;
+  selectedFile = input.files[0];
+  const reader = new FileReader();
+  reader.onload = e => {
+    const prev = document.getElementById('upload-preview');
+    prev.src = e.target.result;
+    prev.style.display = 'block';
+    document.getElementById('upload-icon').style.display = 'none';
+    document.getElementById('upload-text').style.display = 'none';
+  };
+  reader.readAsDataURL(selectedFile);
+}
+
+// SUBMIT
+async function submitPayment() {
+  const supplier = document.getElementById('supplier-name').value.trim();
+  const amount = parseFloat(document.getElementById('amount').value);
+  const notes = document.getElementById('notes').value.trim();
+
+  if (!supplier) return showToast('Please enter a supplier name', 'error');
+  if (!amount || amount <= 0) return showToast('Please enter a valid amount', 'error');
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    let receipt_url = null;
+    let receipt_data = null;
+
+    if (selectedFile) {
+      // Try uploading to Supabase Storage first (works when hosted)
+      try {
+        const ext = selectedFile.name.split('.').pop();
+        const filename = `receipt_${Date.now()}.${ext}`;
+        const uploadRes = await fetch(
+          `${SUPABASE_URL}/storage/v1/object/receipts/${filename}`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'x-upsert': 'false',
+              'Content-Type': selectedFile.type
+            },
+            body: selectedFile
+          }
+        );
+        if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status}`);
+        receipt_url = `${SUPABASE_URL}/storage/v1/object/public/receipts/${filename}`;
+      } catch (uploadErr) {
+        // Fallback: store as base64 in the database (works everywhere)
+        console.warn('Storage upload failed, falling back to base64:', uploadErr.message);
+        receipt_data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result); // data:image/...;base64,...
+          reader.onerror = reject;
+          reader.readAsDataURL(selectedFile);
+        });
+      }
+    }
+
+    const { error } = await db.from('payments').insert({
+      supplier_name: supplier, amount, payment_method: selectedMethod,
+      receipt_url, receipt_data, notes: notes || null
+    });
+    if (error) throw error;
+    showToast('Payment recorded! ✓', 'success');
+    resetForm();
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to save. Please try again.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Record Payment';
+  }
+}
+
+function resetForm() {
+  document.getElementById('supplier-name').value = '';
+  document.getElementById('amount').value = '';
+  document.getElementById('notes').value = '';
+  selectedFile = null;
+  selectedMethod = 'cash';
+  document.querySelectorAll('.method-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+  const prev = document.getElementById('upload-preview');
+  prev.style.display = 'none';
+  document.getElementById('upload-icon').style.display = 'block';
+  document.getElementById('upload-text').style.display = 'block';
+  document.getElementById('receipt-file').value = '';
+}
+
+// DASHBOARD
+async function loadPayments() {
+  const list = document.getElementById('payment-list');
+  list.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
+  const { data, error } = await db.from('payments').select('*').order('created_at', { ascending: false }).limit(100);
+  if (error) {
+    list.innerHTML = '<div class="empty-state"><div>⚠️</div><div>Could not load payments</div></div>';
+    return;
+  }
+  allPayments = data || [];
+  updateStats();
+  renderPayments();
+}
+
+function updateStats() {
+  const total = allPayments.reduce((s, p) => s + parseFloat(p.amount), 0);
+  const now = new Date();
+  const monthTotal = allPayments
+    .filter(p => { const d = new Date(p.created_at); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); })
+    .reduce((s, p) => s + parseFloat(p.amount), 0);
+  document.getElementById('stat-total').textContent = `R ${total.toFixed(2)}`;
+  document.getElementById('stat-count').textContent = allPayments.length;
+  document.getElementById('stat-month').textContent = `R ${monthTotal.toFixed(2)}`;
+}
+
+function setFilter(filter, btn) {
+  activeFilter = filter;
+  document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPayments();
+}
+
+function renderPayments() {
+  const list = document.getElementById('payment-list');
+  const filtered = activeFilter === 'all' ? allPayments : allPayments.filter(p => p.payment_method === activeFilter);
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty-state"><div>🧾</div><div>No payments yet</div></div>';
+    return;
+  }
+  list.innerHTML = filtered.map(p => `
+    <div class="payment-item" onclick='openModal(${JSON.stringify(p)})'>
+      <div class="payment-method-badge ${p.payment_method}">${p.payment_method === 'cash' ? '💵' : '💳'}</div>
+      <div class="payment-info">
+        <div class="payment-supplier">${esc(p.supplier_name)}</div>
+        <div class="payment-date">${fmtDate(p.created_at)}</div>
+      </div>
+      ${(p.receipt_url || p.receipt_data) ? `<img class="receipt-thumb" src="${p.receipt_url || p.receipt_data}" alt="Receipt" onerror="this.style.display='none'">` : ''}
+      <div class="payment-amount">R ${parseFloat(p.amount).toFixed(2)}</div>
+    </div>
+  `).join('');
+}
+
+// MODAL
+function openModal(p) {
+  const img = document.getElementById('modal-receipt-img');
+  const receiptSrc = p.receipt_url || p.receipt_data || null;
+  if (receiptSrc) { img.src = receiptSrc; img.style.display = 'block'; }
+  else { img.style.display = 'none'; }
+  document.getElementById('modal-rows').innerHTML = `
+    <div class="modal-row"><span class="label">Supplier</span><span class="val">${esc(p.supplier_name)}</span></div>
+    <div class="modal-row"><span class="label">Amount</span><span class="val">R ${parseFloat(p.amount).toFixed(2)}</span></div>
+    <div class="modal-row"><span class="label">Method</span><span class="val">${p.payment_method.charAt(0).toUpperCase() + p.payment_method.slice(1)}</span></div>
+    <div class="modal-row"><span class="label">Date</span><span class="val">${fmtDate(p.created_at)}</span></div>
+    ${p.notes ? `<div class="modal-row"><span class="label">Notes</span><span class="val">${esc(p.notes)}</span></div>` : ''}
+  `;
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+function handleModalClick(e) { if (e.target === document.getElementById('modal')) closeModal(); }
+
+// UTILS
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type}`;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
