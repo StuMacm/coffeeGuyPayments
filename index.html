@@ -10,7 +10,60 @@
 <title>CaféPay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+// AI SUMMARY
+async function getSummary() {
+  const btn = document.getElementById('ai-btn');
+  const box = document.getElementById('ai-box');
+  const textEl = document.getElementById('ai-text');
+
+  btn.disabled = true;
+  btn.textContent = '✦ Thinking…';
+  box.classList.add('visible');
+  textEl.innerHTML = '<span class="ai-cursor"></span>';
+
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/functions/v1/summarise-payments`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Request failed');
+    }
+
+    // Stream the response text
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let full = '';
+    textEl.innerHTML = '<span class="ai-cursor"></span>';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      full += decoder.decode(value, { stream: true });
+      textEl.innerHTML = full + '<span class="ai-cursor"></span>';
+    }
+
+    // Remove cursor when done
+    textEl.textContent = full;
+
+  } catch (err) {
+    textEl.textContent = 'Could not load summary: ' + err.message;
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '&#10022; Refresh Summary';
+}
+
+</script>
 <style>
   :root {
     --espresso: #1a0f00;
@@ -41,6 +94,17 @@
   .screen { display: none; min-height: 100dvh; flex-direction: column; animation: fadeIn 0.3s ease; }
   .screen.active { display: flex; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+
+  /* AI Summary */
+  .ai-summary-btn { width: 100%; background: linear-gradient(135deg, #c07d2e, #e8a84a); color: #1a0f00; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 0.85rem; letter-spacing: 0.05em; border: none; border-radius: 12px; padding: 0.85rem; cursor: pointer; margin-bottom: 1.2rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: opacity 0.2s; }
+  .ai-summary-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .ai-summary-box { background: #ffffff08; border: 1px solid #c07d2e44; border-radius: 14px; padding: 1.2rem; margin-bottom: 1.2rem; display: none; }
+  .ai-summary-box.visible { display: block; }
+  .ai-summary-label { font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--caramel); margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.4rem; }
+  .ai-summary-text { font-size: 0.9rem; line-height: 1.65; color: var(--cream); opacity: 0.9; }
+  .ai-cursor { display: inline-block; width: 2px; height: 1em; background: var(--caramel); margin-left: 2px; vertical-align: text-bottom; animation: blink 0.8s step-end infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
 
   /* LOGIN */
   #screen-login {
@@ -246,6 +310,11 @@
       <div class="stat-label">This Month</div>
       <div class="stat-value sm" id="stat-month">—</div>
     </div>
+  </div>
+  <button class="ai-summary-btn" id="ai-btn" onclick="getSummary()">✦ Get AI Spending Summary</button>
+  <div class="ai-summary-box" id="ai-box">
+    <div class="ai-summary-label">✦ Claude says</div>
+    <div class="ai-summary-text" id="ai-text"></div>
   </div>
   <div class="filter-row">
     <button class="filter-chip active" onclick="setFilter('all', this)">All</button>
@@ -508,6 +577,59 @@ function fmtDate(iso) {
 function esc(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// AI SUMMARY
+async function getSummary() {
+  const btn = document.getElementById('ai-btn');
+  const box = document.getElementById('ai-box');
+  const textEl = document.getElementById('ai-text');
+
+  btn.disabled = true;
+  btn.textContent = '✦ Thinking…';
+  box.classList.add('visible');
+  textEl.innerHTML = '<span class="ai-cursor"></span>';
+
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/functions/v1/summarise-payments`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Request failed');
+    }
+
+    // Stream the response text
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let full = '';
+    textEl.innerHTML = '<span class="ai-cursor"></span>';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      full += decoder.decode(value, { stream: true });
+      textEl.innerHTML = full + '<span class="ai-cursor"></span>';
+    }
+
+    // Remove cursor when done
+    textEl.textContent = full;
+
+  } catch (err) {
+    textEl.textContent = 'Could not load summary: ' + err.message;
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '&#10022; Refresh Summary';
+}
+
 </script>
 </body>
 </html>
